@@ -73,9 +73,6 @@ class File {
 
 
   make(make_stack) {
-    if (this.made) {
-      throw new Error(`'${this.path}' is already made`);
-    }
     const make_task = this.getMakeTask();
     if (!make_task) {
       throw new Error(`no task identified to make '${this.path}'`);
@@ -133,11 +130,11 @@ class Task {
 
   execute() {
     if (!this.recipe) {
-      Loggers.Task.warn(`Task.execute() '${this.name}' has no recipe, doing nothing`);
+      Loggers.Task.warn(`Task.execute(): '${this.name}' has no recipe, doing nothing`);
       return;
     }
     if (typeof this.recipe !== "function") {
-      throw new Error(`Task.execute() invalid recipe ${recipe} for '${this.name}'`);
+      throw new Error(`Task.execute(): invalid recipe ${this.recipe} for '${this.name}'`);
     }
     Loggers.Task.warn(`⚒ +${((Date.now() - this.taskset.started_at) / 1000).toFixed(3)}s ${this.name}`);
     const recipeArgs = this.getRecipeArgs();
@@ -286,17 +283,17 @@ class TaskSet {
       throw new Error("TaskSet.add(): no task name nor targets");
     }
     if (Array.isArray(targets_raw) && targets_raw.length > 0 && !targets_raw[0]) {
-      throw new Error(`invalid first target: ${targets_raw}`);
+      throw new Error(`TaskSet.add(): invalid first target: ${targets_raw}`);
     }
     if (typeof recipe !== "function") {
-      throw new Error("a function recipe is required");
+      throw new Error("TaskSet.add(): a function recipe is required");
     }
     name = name || "rule: " + (
       (typeof targets_raw === "string") ? targets_raw :
         (targets_raw[0] + (
           (targets_raw.length > 1) ? (" + " + (targets_raw.length - 1) + " others") : "")));
     if (this.all_tasks[name]) {
-      throw new Error(`task '${name}' already exists`);
+      throw new Error(`TaskSet.add(): task '${name}' already exists`);
     }
     const new_task = new Task(this, name, targets_raw, prereq_raw, recipe, options);
     this.all_tasks[name] = new_task;
@@ -349,11 +346,6 @@ class TaskSet {
   }
 
 
-  getLoggers() {
-    return Loggers;
-  }
-
-
   getTask(name) {
     return this.all_tasks[name]; // simple string match
   }
@@ -382,10 +374,10 @@ class TaskSet {
 
   run(name) {
     if (!name) {
-      throw new Error("no target specified to run");
+      throw new Error("TaskSet.run(): no target specified to run");
     }
     if (this.run_status === 1) {
-      throw new Error("in the middle of a previous exection");
+      throw new Error("TaskSet.run(): in the middle of a previous exection");
     }
     if (this.run_status === 2) {
       this.reset();
@@ -408,13 +400,11 @@ class TaskSet {
     }
     const file = this.getFile(name);
     if (file.needsMaking()) {
-      Loggers.TaskSet.info(`TaskSet.run(${name}) - identified as a file that needs making`);
+      Loggers.TaskSet.info(`TaskSet.run(${name}) - assumed to be a file that needs making`);
       return makeThing(file);
-    } else if (file.exists()) {
-      Loggers.TaskSet.info(`TaskSet.run(${name}) - identified as a file that does not need making`);
-      return Promise.resolve([]);
     } else {
-      return Promise.reject(`TaskSet.run(${name}) - not recognised as a task or a file`);
+      Loggers.TaskSet.info(`TaskSet.run(${name}) - assumed to be a file that does not need making`);
+      return Promise.resolve([]);
     }
   }
 
@@ -430,7 +420,7 @@ class TaskSet {
     const file = this.getFile(name);
     if (file) {
       const make_task = file.getMakeTask();
-      console.log(`TaskSet.which(${name}) - identified as a file whose make-task is: ${make_task.name}`);
+      console.log(`TaskSet.which(${name}) - assumed to be a file whose make-task is: ${make_task.name}`);
     }
   }
 
@@ -438,6 +428,11 @@ class TaskSet {
 
 module.exports = function () {
   return new TaskSet();
+};
+
+
+module.exports.getLoggers = function () {
+  return Loggers;
 };
 
 

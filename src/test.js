@@ -66,9 +66,14 @@ test("simple file dependency", t => {
     return Promise.resolve(null);
   });
 
-  let lm_b;
+  t.is(taskset.getFile("build/a").getPath(), "build/a");
+  t.is(taskset.getTask("rule: build/b").descr, undefined);
+  taskset.getTask("rule: build/b").desc("foo");
+  t.is(taskset.getTask("rule: build/b").descr, "foo");
+  taskset.getTask("rule: build/b").description("bar");
+  t.is(taskset.getTask("rule: build/b").descr, "bar");
 
-  // console.log(`Part A ${Date.now()}`);
+  let lm_b;
 
   return sleep(10)
     .then(() => {
@@ -86,37 +91,51 @@ test("simple file dependency", t => {
       // console.log(`${lm_b} === ${Fs.statSync("build/b").mtime.valueOf()}`);
       t.true((lm_b === lastMod("build/b")), "b is unchanged");
 
-      // console.log(`Part C ${Date.now()}`);
       return sleep(10);
     })
     .then(() => {
-      // console.log(`Part D ${Date.now()}`);
       makeFile("build/b");
       return taskset.run("build/b");
     })
     .then((make_stack) => {
       t.true(make_stack.length === 0, "0 tasks executed");
       t.true((lm_b < lastMod("build/b")), "b is unchanged");
-
-      // console.log(`Part E ${Date.now()}`);
       return sleep(10);
     })
     .then(() => {
-      // console.log(`Part F ${Date.now()}`);
       makeFile("build/a");
-      // console.log(`Part G ${Date.now()}`);
       return sleep(10);
     })
     .then(() => {
-      // console.log(`Part H ${Date.now()}`);
       return taskset.run("build/b");
     })
     .then((make_stack) => {
       t.is(make_stack.length, 1, "1 tasks executed");
       t.true(exists("build/b"), "copy a to b");
       t.true((lm_b < lastMod("build/b")), "b is updated");
-      // console.log(`${lastMod("build/b")} > ${lastMod("build/a")}`);
       t.true(isNewerThan("build/b", "build/a"), "b is newer than a");
+
+      t.throws(() => {
+        taskset.run("foo");
+      }, {
+        instanceOf: Error,
+        message: "no task identified to make 'foo'",
+      });
+
+      t.throws(() => {
+        taskset.run("foo");
+      }, {
+        instanceOf: Error,
+        message: "TaskSet.run(): in the middle of a previous exection",
+      });
+
+      t.throws(() => {
+        taskset.run();
+      }, {
+        instanceOf: Error,
+        message: "TaskSet.run(): no target specified to run",
+      });
+
     });
 
 });
@@ -300,4 +319,90 @@ test("p <- n <- m <- p; dependency circularity", t => {
       t.is(error.message, "Task.make() \'rule: build/p\' RECURSION, stack: rule: build/p,rule: build/n,rule: build/m");
     });
 
+});
+
+
+
+test("internal state", t => {
+  const taskset = TaskSet();
+  t.deepEqual(taskset.all_files, {}, "all_files initialised to an empty object");
+  t.deepEqual(taskset.all_tasks, {}, "all_tasks initialised to an empty object");
+  t.is(taskset.run_status, 0, "run_status initialised to 0");
+});
+
+
+test("general validation", t => {
+  const taskset = TaskSet();
+  // const error =
+  t.throws(() => {
+		taskset.add(1, null, null, () => {});
+  }, {
+    instanceOf: Error,
+    message: "TaskSet.add(): no task name nor targets",
+  });
+  t.throws(() => {
+		taskset.add(null, [], null, () => {});
+  }, {
+    instanceOf: Error,
+    message: "TaskSet.add(): no task name nor targets",
+  });
+  t.throws(() => {
+		taskset.add(null, [ null, "blah" ], null, () => {});
+  }, {
+    instanceOf: Error,
+    message: "TaskSet.add(): invalid first target: ,blah",
+  });
+  taskset.add("foo", null, null, () => {});
+  t.throws(() => {
+		taskset.add("foo", null, null, () => {});
+  }, {
+    instanceOf: Error,
+    message: "TaskSet.add(): task 'foo' already exists",
+  });
+  // error.regex(error, //);
+
+  taskset.getTask("foo").recipe = 2;
+  t.throws(() => {
+		taskset.getTask("foo").execute();
+  }, {
+    instanceOf: Error,
+    message: "Task.execute(): invalid recipe 2 for 'foo'",
+  });
+
+});
+
+
+test("console.log output", t => {
+  const orig_console_log = console.log;
+  const log_capture = [];
+  console.log = (str) => {
+    log_capture.push(str);
+  };
+  const taskset = TaskSet();
+  taskset.add("foo", [ "a", "b" ], [ "c", "d" ], () => {}, { description: "more about foo" });
+  taskset.add("bar", null, null, () => {}, { description: "something about bar" });
+  taskset.list();
+  t.deepEqual(log_capture, [ " bar  something about bar", " foo  more about foo", ]);
+  log_capture.splice(0, log_capture.length);
+
+  taskset.which("foo");
+  t.deepEqual(log_capture, [ "TaskSet.which(foo) - identified as a task", "  targets: a,b", "  prereqs: c,d" ]);
+  log_capture.splice(0, log_capture.length);
+
+  taskset.which("a");
+  t.deepEqual(log_capture, [ "TaskSet.which(a) - assumed to be a file whose make-task is: foo" ]);
+  log_capture.splice(0, log_capture.length);
+
+  const orig_warn_log = TaskSet.getLoggers().Task.warn;
+  TaskSet.getLoggers().Task.warn = console.log;
+
+  taskset.getTask("foo").recipe = null;
+  taskset.getTask("foo").execute();
+  t.deepEqual(log_capture, [ "Task.execute(): 'foo' has no recipe, doing nothing" ]);
+  log_capture.splice(0, log_capture.length);
+
+  TaskSet.setLogLevel("SILENT"); // return to usual level
+
+  console.log = orig_console_log;
+  TaskSet.getLoggers().Task.warn = orig_warn_log;
 });
