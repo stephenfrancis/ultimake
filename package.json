@@ -1,0 +1,29 @@
+{
+  "main": "src/BuildLib.js",
+  "name": "ultimake",
+  "version": "0.0.1",
+  "description": "Build Tools",
+  "engines": {
+    "node": "^10.17"
+  },
+  "scripts": {
+    "diagnosis": "ava -t --serial src/test.js",
+    "test": "ava src/test.js"
+  },
+  "author": "stephen.d.francis@gmail.com",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:stephenfrancis/ultimake.git"
+  },
+  "license": "ISC",
+  "sideEffects": false,
+  "dependencies": {
+    "chalk": "^3.0.0",
+    "glob": "^7.1.6",
+    "loglevel": "^1.6.7",
+    "yargs": "^15.1.0"
+  },
+  "devDependencies": {
+    "ava": "^3.5.0"
+  }
+}
