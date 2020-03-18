@@ -50,7 +50,7 @@ deleteAll();
 
 //---------------------------------------------------------------------
 
-test("simple file dependency", t => {
+test("simple file dependency", async t => {
 
   // deleteAll();
   makeFile("build/a");
@@ -58,7 +58,7 @@ test("simple file dependency", t => {
   const taskset = TaskSet();
   // const lm_a = Fs.statSync("build/a").mtime;
 
-  taskset.add(null, "build/b", "build/a", (targets_raw, prereqs_raw, name) => {
+  const task = taskset.add(null, "build/b", "build/a", (targets_raw, prereqs_raw, name) => {
     copyFile("build/a", "build/b");
     t.is(targets_raw, "build/b", "0th arg of recipe - targets");
     t.is(prereqs_raw, "build/a", "1st arg of recipe - prereqs");
@@ -67,11 +67,14 @@ test("simple file dependency", t => {
   });
 
   t.is(taskset.getFile("build/a").getPath(), "build/a");
-  t.is(taskset.getTask("rule: build/b").descr, undefined);
-  taskset.getTask("rule: build/b").desc("foo");
-  t.is(taskset.getTask("rule: build/b").descr, "foo");
-  taskset.getTask("rule: build/b").description("bar");
-  t.is(taskset.getTask("rule: build/b").descr, "bar");
+  t.is(task.getName(), "rule: build/b");
+  t.is(task.descr, undefined);
+  task.desc("foo");
+  t.is(task.descr, "foo");
+  task.description("bar");
+  t.is(task.descr, "bar");
+  t.true(!task.isCompleted(), "task is marked as not completed");
+  t.true(task.needsMaking(), "task is marked as needing making");
 
   let lm_b;
 
@@ -80,14 +83,18 @@ test("simple file dependency", t => {
       return taskset.run("build/b");
     })
     .then((make_stack) => {
-      t.true(make_stack.length === 1, "1 tasks executed");
+      t.is(make_stack.length, 1, "1 tasks executed");
       t.true(exists("build/b"), "copy a to b");
       t.true(isNewerThan("build/b", "build/a"), "b is newer than a");
+      t.true(typeof task.getLastModified() === "number" && task.getLastModified() > lastMod("build/a"), "task last modified date");
+      t.is(task, task.getMakeTask(), "a task's make-task is itself");
+      t.true(task.isCompleted(), "task is marked as completed");
+      t.true(!task.needsMaking(), "task is marked not needing making");
       lm_b = lastMod("build/b");
       return taskset.run("build/b");
     })
     .then((make_stack) => {
-      t.true(make_stack.length === 0, "0 tasks executed");
+      t.is(make_stack.length, 0, "0 tasks executed");
       // console.log(`${lm_b} === ${Fs.statSync("build/b").mtime.valueOf()}`);
       t.true((lm_b === lastMod("build/b")), "b is unchanged");
 
@@ -98,7 +105,7 @@ test("simple file dependency", t => {
       return taskset.run("build/b");
     })
     .then((make_stack) => {
-      t.true(make_stack.length === 0, "0 tasks executed");
+      t.is(make_stack.length, 0, "0 tasks executed");
       t.true((lm_b < lastMod("build/b")), "b is unchanged");
       return sleep(10);
     })
@@ -142,7 +149,7 @@ test("simple file dependency", t => {
 
 
 
-test("2 <- 2 file dependency", t => {
+test("2 <- 2 file dependency", async t => {
 
   const taskset = TaskSet();
   // deleteAll();
@@ -151,11 +158,13 @@ test("2 <- 2 file dependency", t => {
   makeFile("build/d");
   // const lm_a = Fs.statSync("build/c").mtime;
 
-  taskset.add(null, [ "build/e", "build/f" ], [ "build/c", "build/d" ], () => {
+  const task = taskset.add(null, [ "build/e", "build/f" ], [ "build/c", "build/d" ], () => {
     copyFile("build/c", "build/e");
     copyFile("build/d", "build/f");
     return Promise.resolve(null);
   });
+
+  t.is(task.getName(), "rule: build/e + 1 other");
 
   let lm_c;
 
@@ -284,8 +293,6 @@ test("k <- h, i <- 2 <- 1 file dependency - multi deps", t => {
 });
 
 
-
-
 test("p <- n <- m <- p; dependency circularity", t => {
 
   const taskset = TaskSet();
@@ -318,9 +325,88 @@ test("p <- n <- m <- p; dependency circularity", t => {
     .catch((error) => {
       t.is(error.message, "Task.make() \'rule: build/p\' RECURSION, stack: rule: build/p,rule: build/n,rule: build/m");
     });
-
 });
 
+
+test("unmade targets", t => {
+
+  const taskset = TaskSet();
+
+  taskset.add(null, [ "build/q", "build/r" ], null, () => {
+    return Promise.resolve(null); // doesn't make q or r
+  });
+
+  return taskset.run("build/q")
+    .then(() => {
+      t.fail("should have thrown");
+    })
+    .catch((error) => {
+      t.regex(error.message, /Task\.markCompleted\(\) 'rule: build\/q \+ 1 other' failed to make targets: /);
+      t.regex(error.message, /build\/q, exists\? false, time diff\? -\d{13}s/);
+      t.regex(error.message, /build\/r, exists\? false, time diff\? -\d{13}s/);
+    });
+});
+
+
+test("multi deps - prereqs as named tasks", t => {
+
+  const taskset = TaskSet();
+  // deleteAll();
+
+  makeFile("build/s");
+  // const lm_a = Fs.statSync("build/g").mtime;
+
+  taskset.add("taskT", "build/t", "build/s", () => {
+    copyFile("build/s", "build/t");
+    return Promise.resolve(null);
+  });
+
+  taskset.add("taskU", [ "build/u", "build/v" ], [ "build/s", "taskT" ], () => {
+    copyFile("build/s", "build/u");
+    copyFile("build/t", "build/v");
+    return Promise.resolve(null);
+  });
+
+  taskset.add("taskW", "build/w", [ /*"taskT",*/ "taskU", ], () => {
+    copyFile("build/u", "build/w");
+    return Promise.resolve(null);
+  });
+
+  let lm_w;
+
+  return sleep(10)
+    .then(() => {
+      return taskset.run("taskW");
+    })
+    .then((make_stack) => {
+      t.is(make_stack.length, 3, "3 tasks executed");
+      t.true(exists("build/t"), "copy s to t");
+      t.true(exists("build/u"), "copy s to u");
+      t.true(exists("build/v"), "copy t to v");
+      t.true(exists("build/w"), "copy u to w");
+      t.true(isNewerThan("build/t", "build/s"), "t is newer than s");
+      t.true(isNewerThan("build/u", "build/s"), "u is newer than s");
+      t.true(isNewerThan("build/v", "build/s"), "v is newer than s");
+      t.true(isNewerThan("build/w", "build/s"), "w is newer than s");
+      lm_w = lastMod("build/w");
+      return taskset.run("build/w");
+    })
+    .then((make_stack) => {
+      t.is(make_stack.length, 0, "0 tasks executed");
+      // console.log(`${lm_b} === ${Fs.statSync("build/h").mtime.valueOf()}`);
+      t.is(lm_w, lastMod("build/w"), "w is unchanged");
+
+      return sleep(10);
+    })
+    .then(() => {
+      return taskset.run("taskW");
+    })
+    .then((make_stack) => {
+      t.is(make_stack.length, 3, "3 tasks executed");
+      t.true((lm_w < lastMod("build/w")), "w is changed");
+    });
+
+});
 
 
 test("internal state", t => {
@@ -328,6 +414,10 @@ test("internal state", t => {
   t.deepEqual(taskset.all_files, {}, "all_files initialised to an empty object");
   t.deepEqual(taskset.all_tasks, {}, "all_tasks initialised to an empty object");
   t.is(taskset.run_status, 0, "run_status initialised to 0");
+
+  taskset.clear();
+  t.deepEqual(taskset.all_files, {}, "all_files cleared to an empty object");
+  t.deepEqual(taskset.all_tasks, {}, "all_tasks cleared to an empty object");
 });
 
 
@@ -352,7 +442,33 @@ test("general validation", t => {
     instanceOf: Error,
     message: "TaskSet.add(): invalid first target: ,blah",
   });
-  taskset.add("foo", null, null, () => {});
+  t.throws(() => {
+		taskset.add("foo", [ "blah" ], null, null);
+  }, {
+    instanceOf: Error,
+    message: "TaskSet.add(): a function recipe is required",
+  });
+
+  const task = taskset.add("foo", null, null, () => {});
+  t.is(task.getName(), "foo");
+  t.false(task.targetMatches("blah"), "targetMatches() always false if no targets defined");
+  task.forEachTarget(() => {
+    t.fail("no target - shouldn't be called");
+  });
+  task.targets_raw = () => {};
+  t.throws(() => {
+    task.forEachTarget();
+  }, {
+    instanceOf: Error,
+    message: "Task.forEachTarget(): target type not supported at the moment: 'foo', function",
+  });
+  t.throws(() => {
+    taskset.forEachPrereq(() => {}, [ () => {} ]);
+  }, {
+    instanceOf: Error,
+    message: "TaskSet.forEachPrereq(): prereq type not supported at the moment: function",
+  });
+
   t.throws(() => {
 		taskset.add("foo", null, null, () => {});
   }, {
@@ -361,13 +477,27 @@ test("general validation", t => {
   });
   // error.regex(error, //);
 
-  taskset.getTask("foo").recipe = 2;
+  task.recipe = 2;
   t.throws(() => {
-		taskset.getTask("foo").execute();
+		task.execute();
   }, {
     instanceOf: Error,
     message: "Task.execute(): invalid recipe 2 for 'foo'",
   });
+
+  task.done = true;
+  t.throws(() => {
+		task.make();
+  }, {
+    instanceOf: Error,
+    message: "Task.make() 'foo' has already been done",
+  });
+
+  const task2 = taskset.add(null, [ "b", "c", "d", "e" ], null, () => {});
+  t.is(task2.getName(), "rule: b + 3 others");
+
+  const task3 = taskset.add(null, [ "a" ], null, () => {});
+  t.is(task3.getName(), "rule: a");
 
 });
 
@@ -380,9 +510,9 @@ test("console.log output", t => {
   };
   const taskset = TaskSet();
   taskset.add("foo", [ "a", "b" ], [ "c", "d" ], () => {}, { description: "more about foo" });
-  taskset.add("bar", null, null, () => {}, { description: "something about bar" });
+  taskset.add("bar", null, null, () => {});
   taskset.list();
-  t.deepEqual(log_capture, [ " bar  something about bar", " foo  more about foo", ]);
+  t.deepEqual(log_capture, [ " bar  ", " foo  more about foo", ]);
   log_capture.splice(0, log_capture.length);
 
   taskset.which("foo");

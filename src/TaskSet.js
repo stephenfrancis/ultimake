@@ -151,7 +151,7 @@ class Task {
     } else if (typeof this.targets_raw === "string") {
       callback(this.targets_raw);
     } else {
-      throw new Error(`target type not supported at the moment: ${targets_raw}, ${typeof targets_raw}`);
+      throw new Error(`Task.forEachTarget(): target type not supported at the moment: '${this.name}', ${typeof this.targets_raw}`);
     }
   }
 
@@ -163,6 +163,11 @@ class Task {
 
   getMakeTask() {
     return this;
+  }
+
+
+  getName() {
+    return this.name;
   }
 
 
@@ -236,7 +241,7 @@ class Task {
       }
     });
     if (unmade_targets.length > 0) {
-      throw new Error(`exec '${this.name}' failed to make targets: ${unmade_targets.join("; ")}`);
+      throw new Error(`Task.markCompleted() '${this.name}' failed to make targets: ${unmade_targets.join("; ")}`);
     }
     this.finished_make_at = Date.now();
     this.done = true;
@@ -291,7 +296,8 @@ class TaskSet {
     name = name || "rule: " + (
       (typeof targets_raw === "string") ? targets_raw :
         (targets_raw[0] + (
-          (targets_raw.length > 1) ? (" + " + (targets_raw.length - 1) + " others") : "")));
+          (targets_raw.length === 2) ? " + 1 other" :
+            (targets_raw.length > 2) ? (" + " + (targets_raw.length - 1) + " others") : "")));
     if (this.all_tasks[name]) {
       throw new Error(`TaskSet.add(): task '${name}' already exists`);
     }
@@ -320,13 +326,10 @@ class TaskSet {
         callback(task, prereqs_raw);
       } else {
         const file = this.getFile(prereqs_raw);
-        if (!file) {
-          throw new Error(`no task found for prereq '${prereqs_raw}'`);
-        }
         callback(file, prereqs_raw);
       }
     } else {
-      throw new Error(`prereq type not supported at the moment: '${prereqs_raw}', ${typeof prereqs_raw}`);
+      throw new Error(`TaskSet.forEachPrereq(): prereq type not supported at the moment: ${typeof prereqs_raw}`);
     }
   }
 
@@ -418,10 +421,8 @@ class TaskSet {
       return;
     }
     const file = this.getFile(name);
-    if (file) {
-      const make_task = file.getMakeTask();
-      console.log(`TaskSet.which(${name}) - assumed to be a file whose make-task is: ${make_task.name}`);
-    }
+    const make_task = file.getMakeTask();
+    console.log(`TaskSet.which(${name}) - assumed to be a file whose make-task is: ${make_task.name}`);
   }
 
 }
