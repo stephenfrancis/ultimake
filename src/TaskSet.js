@@ -291,7 +291,7 @@ class TaskSet {
       throw new Error(`TaskSet.add(): invalid first target: ${targets_raw}`);
     }
     if (typeof recipe !== "function") {
-      throw new Error("TaskSet.add(): a function recipe is required");
+      throw new Error("TaskSet.add(): a recipe function is required");
     }
     name = name || "rule: " + (
       (typeof targets_raw === "string") ? targets_raw :

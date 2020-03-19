@@ -299,6 +299,9 @@ module.exports.getRelativePath = (abs_path) => {
 };
 
 
+module.exports.newTaskSet = TaskSet;
+
+
 module.exports.useBuildVars = (build_vars_source, build_vars_target) => {
 	build_vars.source = build_vars_source;
 	build_vars.target = build_vars_target;

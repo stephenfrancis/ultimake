@@ -296,31 +296,19 @@ test("k <- h, i <- 2 <- 1 file dependency - multi deps", t => {
 test("p <- n <- m <- p; dependency circularity", t => {
 
   const taskset = TaskSet();
-  // deleteAll();
 
+  taskset.add(null, "build/p", "build/n", () => {});
 
-  taskset.add(null, "build/p", "build/n", () => {
-    copyFile("build/n", "build/p");
-    return Promise.resolve(null);
-  });
+  taskset.add(null, "build/n", "build/m", () => {});
 
-  taskset.add(null, "build/n", "build/m", () => {
-    copyFile("build/m", "build/n");
-    return Promise.resolve(null);
-  });
-
-  taskset.add(null, "build/m", "build/p", () => {
-    copyFile("build/p", "build/m");
-    return Promise.resolve(null);
-  });
-
+  taskset.add(null, "build/m", "build/p", () => {});
 
   return sleep(10)
     .then(() => {
       return taskset.run("build/p");
     })
     .then(() => {
-      t.fail();
+      t.fail("should have thrown");
     })
     .catch((error) => {
       t.is(error.message, "Task.make() \'rule: build/p\' RECURSION, stack: rule: build/p,rule: build/n,rule: build/m");
@@ -446,7 +434,7 @@ test("general validation", t => {
 		taskset.add("foo", [ "blah" ], null, null);
   }, {
     instanceOf: Error,
-    message: "TaskSet.add(): a function recipe is required",
+    message: "TaskSet.add(): a recipe function is required",
   });
 
   const task = taskset.add("foo", null, null, () => {});

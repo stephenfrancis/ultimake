@@ -1,6 +1,9 @@
 # ultimake
 Ultimate Make Toolkit
 
+![Node.js CI](https://github.com/stephenfrancis/ultimake/workflows/Node.js%20CI/badge.svg)
+
+
 I know, Yet Another Javascript Make Tool.
 
 Its goal is to help make better builds by:
@@ -11,17 +14,19 @@ Its goal is to help make better builds by:
 
 ## Usage and API
 
+`npm install --save ultimake`
+
 
 ### 1. Use the TaskSet Object Directly
 
 ```
-  const TaskSet = require("ultimake/TaskSet");
+  const newTaskSet = require("ultimake").newTaskSet;
 
   // change level of logging output if desired
-  TaskSet.setLogLevel("SILENT");
+  newTaskSet.setLogLevel("ERROR");
 
   // make a new TaskSet object
-  const taskset = TaskSet();
+  const taskset = newTaskSet();
 
   // add a task to the TaskSet object
 
@@ -63,14 +68,18 @@ Its goal is to help make better builds by:
 
 ### 2. Use the Build Tools Library
 
+e.g. src/config/build.js:
+
 ```
-const BuildLib = require("paraguay/BuildLib");
+#!/usr/bin/env node
+
+const BuildLib = require("ultimake/BuildLib");
 const { exec, glob, run, task } = BuildLib.getBuildFunctions({
   build_vars_source: "src/config/BuildVars.json",
   build_vars_target: "build/vars.json",
 });
 
-// task() = taskset.add()
+// task(...) = taskset.add(...)
 
 // exec("os command", options); - returns a promise on child_process.exec()
 
@@ -78,8 +87,7 @@ const { exec, glob, run, task } = BuildLib.getBuildFunctions({
 
 // run() = taskset.run(cmd line target)
 
-// e.g. src/config/build.js:
-#!/usr/bin/env node
+//
 
 const source = glob("src/**/*.ts");
 const target = source
@@ -91,7 +99,6 @@ task("build", target, source, () => {
 
 run();
 
-
-// > src/config/build.js build
-
 ```
+
+`> src/config/build.js build`
