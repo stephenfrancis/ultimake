@@ -394,7 +394,7 @@ class TaskSet {
         count: 0,
       };
       return thing.make(null, counter)
-        .then((count) => {
+        .then(() => {
           this.run_status = 2;
           return counter.count;
         });

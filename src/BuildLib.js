@@ -219,6 +219,10 @@ module.exports.createDir = (path) => {
 
 module.exports.exec = function (os_cmd, options) {
 	Log.debug(`running os command: ${os_cmd}`);
+	const temp = new Error();
+	const stack = temp.stack.split("\n");
+	const src_line = stack.length > 2 && stack[2] && stack[2].substr(29);
+
 	return new Promise((resolve, reject) => {
 		const proc = Cp.exec(os_cmd, options);
 		proc.stdout.on("data", (data) => {
@@ -232,7 +236,7 @@ module.exports.exec = function (os_cmd, options) {
 			if (code === 0) {
 				resolve();
 			} else {
-				reject(code);
+				reject(`error: ${code}, from: '${os_cmd}', at: ${src_line}`);
 			}
 		});
 	});
@@ -275,7 +279,11 @@ module.exports.getBuildFunctions = function (opts) {
 		} else if (yargv.w) {
 			taskset.which(target);
 		} else if (target) {
-			await taskset.run(target);
+			taskset.run(target)
+				.catch((error) => {
+					console.error(error);
+				});
+
 		} else {
 			throw new Error(`no make target specified`);
 		}
