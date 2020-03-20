@@ -72,7 +72,7 @@ class File {
   }
 
 
-  make(make_stack) {
+  make(make_stack, counter) {
     const make_task = this.getMakeTask();
     if (!make_task) {
       throw new Error(`no task identified to make '${this.path}'`);
@@ -80,7 +80,7 @@ class File {
     this.does_exist = null; // boolean - force these to be re-obtained when next required
     this.last_modified = null; // number
     Loggers.File.debug(`File.make() ${this.path} calling make() for ${make_task.name}`);
-    return make_task.make(make_stack);
+    return make_task.make(make_stack, counter);
   }
 
 
@@ -192,8 +192,9 @@ class Task {
   }
 
 
-  make(make_stack) {
+  make(make_stack, counter) {
     make_stack = make_stack || [];
+    counter    = counter    || { count: 0 };
     if (make_stack.indexOf(this.name) > -1) {
       throw new Error(`Task.make() '${this.name}' RECURSION, stack: ${make_stack}`);
     }
@@ -211,8 +212,8 @@ class Task {
         Loggers.Task.debug(`Task.make() make_stack: ${make_stack}`);
         Loggers.Task.info(`Task.make() ${this.name}`);
         this.taskset.forEachPrereq((task_or_file) => {
-          if (task_or_file.needsMaking()) {
-            promises.push(task_or_file.make(make_stack));
+          if (task_or_file.needsMaking()) { // use slice() to shallow-copy the make_stack array
+            promises.push(task_or_file.make(make_stack.slice(), counter)); // for each prereq branch
           }
         }, this.prereqs_raw);
         return Promise.all(promises);
@@ -221,8 +222,8 @@ class Task {
         return this.execute();
       })
       .then(() => {
+        counter.count += 1;
         this.markCompleted();
-        return make_stack;
       });
     return this.make_promise;
   }
@@ -389,10 +390,13 @@ class TaskSet {
     const makeThing = (thing) => {
       this.run_status = 1;
       this.started_at = Date.now();
-      return thing.make()
-        .then((make_stack) => {
+      const counter = {
+        count: 0,
+      };
+      return thing.make(null, counter)
+        .then((count) => {
           this.run_status = 2;
-          return make_stack;
+          return counter.count;
         });
     }
 
@@ -407,7 +411,7 @@ class TaskSet {
       return makeThing(file);
     } else {
       Loggers.TaskSet.info(`TaskSet.run(${name}) - assumed to be a file that does not need making`);
-      return Promise.resolve([]);
+      return Promise.resolve(0);
     }
   }
 

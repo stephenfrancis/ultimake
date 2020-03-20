@@ -1,7 +1,7 @@
 {
   "main": "src/BuildLib.js",
   "name": "ultimake",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Build Tools",
   "engines": {
     "node": "^10.17"
