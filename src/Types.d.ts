@@ -24,9 +24,43 @@ export type ExecFunction = (command: string, options?: ExecOptions) => Promise<v
 
 export type GlobFunction = (pattern: string, options?: any) => string[];
 
-export type TaskFunction = (name: string, target: string | string[], prerequisites?: string | string[],
+export type  RunFunction = () => void;
+
+export type TaskFunction = (name: string, target: string | string[], prerequisites: string | string[],
                             recipe: RecipeFunction, options?: TaskOptions) => Task;
 
 export declare class Task {
   description: (descr: string) => void;
+}
+
+export declare class TaskSet {
+
+}
+
+declare module "ultimake" {
+
+  function convertSourceToTarget(source_prefix: string, target_prefix: string, from_suffix: string, to_suffix: string): string;
+
+  function convert(regex: RegExp, prefix: string, suffix: string): string;
+
+  function basedir(path: string): string;
+
+  function createDir(path: string): void;
+
+  function exec(os_cmd: string, options): Promise<void>;
+
+  function execSync(cmd: string): string[];
+
+  function execSyncLogOutput(cmd: string): void;
+
+  function getArgs(): any;
+
+  function getBuildFunctions(opts): { exec: ExecFunction, glob: GlobFunction, run: RunFunction, task: TaskFunction };
+
+  function getRelativePath(abs_path: string): string;
+
+  function newTaskSet(): TaskSet;
+
+  function useBuildVars(build_vars_source: string, build_vars_target: string): void;
+
 }
