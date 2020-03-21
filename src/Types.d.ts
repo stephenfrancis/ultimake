@@ -39,11 +39,11 @@ export declare class TaskSet {
 
 declare module "ultimake" {
 
-  function convertSourceToTarget(source_prefix: string, target_prefix: string, from_suffix: string, to_suffix: string): string;
-
-  function convert(regex: RegExp, prefix: string, suffix: string): string;
-
   function basedir(path: string): string;
+
+  function convertSourceToTarget(source_prefix: string, target_prefix: string, from_suffix: string, to_suffix: string): (from: string) => string;
+
+  function convert(regex: RegExp, prefix: string, suffix: string): (from: string) => string;
 
   function createDir(path: string): void;
 
