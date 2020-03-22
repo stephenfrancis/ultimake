@@ -35,7 +35,20 @@ export declare class Task {
 
 export declare class TaskSet {
 
+  public add: TaskFunction;
+
+  public clear(): void; // remove all added tasks
+
+  public getTask(name: string): Task;
+
+  public list(): void; // output list of available tasks to console.log
+
+  public run: RunFunction;
+
+  public which(name: string): void; // show targets and prereqs of named task, or task of named file
+
 }
+
 
 declare module "ultimake" {
 
@@ -47,11 +60,11 @@ declare module "ultimake" {
 
   function createDir(path: string): void;
 
-  function exec(os_cmd: string, options): Promise<void>;
+  function exec(os_cmd: string, options?: ExecOptions): Promise<void>;
 
-  function execSync(cmd: string): string[];
+  function execSync(cmd: string, options?: ExecOptions): string[];
 
-  function execSyncLogOutput(cmd: string): void;
+  function execSyncLogOutput(cmd: string, options?: ExecOptions): void;
 
   function getArgs(): any;
 

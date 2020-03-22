@@ -180,6 +180,11 @@ const writeNewVars = (data) => {
 
 // exports
 
+module.exports.basedir = (path) => {
+	return path.substr(0, path.lastIndexOf("/"));
+};
+
+
 module.exports.convertSourceToTarget = (source_prefix, target_prefix, from_suffix, to_suffix) => {
 	return module.exports.convert(
 		new RegExp("^" + source_prefix + "(/.*)" + from_suffix + "$"),
@@ -202,11 +207,6 @@ module.exports.convert = (regex, prefix, suffix) => {
 const dirs_created = {};
 
 
-module.exports.basedir = (path) => {
-	return path.substr(0, path.lastIndexOf("/"));
-};
-
-
 module.exports.createDir = (path) => {
 	const dir = module.exports.basedir(path);
 	if (!dirs_created[dir]) {
@@ -218,6 +218,8 @@ module.exports.createDir = (path) => {
 
 
 module.exports.exec = function (os_cmd, options) {
+	options = options || {};
+	options.encoding = options.encoding || "utf8";
 	Log.debug(`running os command: ${os_cmd}`);
 	const temp = new Error();
 	const stack = temp.stack.split("\n");
@@ -243,13 +245,15 @@ module.exports.exec = function (os_cmd, options) {
 };
 
 
-module.exports.execSync = function (cmd) {
-  return Cp.execSync(cmd, { encoding: "utf8" }).split("\n");
+module.exports.execSync = function (cmd, options) {
+	options = options || {};
+	options.encoding = options.encoding || "utf8";
+  return Cp.execSync(cmd, options).split("\n");
 };
 
 
-module.exports.execSyncLogOutput = function (cmd) {
-	module.exports.execSync(cmd)
+module.exports.execSyncLogOutput = function (cmd, options) {
+	module.exports.execSync(cmd, options)
 		.filter((line, index) => !!line || (index > 0))
 		.forEach((line) => Log.info(line));
 };
