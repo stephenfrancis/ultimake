@@ -326,7 +326,7 @@ module.exports.useBuildVars = (build_vars_source, build_vars_target) => {
 };
 
 
-module.exports.versionClick = (version_level) => {
+module.exports.versionClick = (version_level, commit_msg) => {
 	const version_level_labels = [ "major", "minor", "patch" ];
 	const version_level_index  = version_level_labels.indexOf(version_level);
 	if (version_level_index === -1) {
@@ -353,7 +353,13 @@ module.exports.versionClick = (version_level) => {
 	Fs.writeFileSync("package.json", JSON.stringify(package_data, null, 2) + "\n", {
 		encoding: "utf8",
 	});
-	Cp.execSync(`git commit -a -m "${version_level} version click to: ${version_new_str}"`);
+	if (commit_msg) {
+		commit_msg += "; vclick: " + version_new_str;
+	} else {
+		commit_msg = `${version_level} version click to: ${version_new_str}`;
+	}
+	Cp.execSync(`git commit -a -m "${commit_msg}"`);
+	Cp.execSync(`git push`);
 	Cp.execSync(`git tag ${version_new_str}`);
 	Cp.execSync(`git push --tags`);
 	if (package_data.ultimake_settings && package_data.ultimake_settings.exec_on_version_click) {
