@@ -146,6 +146,12 @@ const isClean = () => {
 }
 
 
+const reportErrorAndExit = (error) => {
+	console.error(error);
+	process.exit(1);
+}
+
+
 const validateBranchName = (branch) => {
   if (!branch) {
     throw new Error(`ERROR branch argument is blank`);
@@ -285,11 +291,11 @@ module.exports.getBuildFunctions = function (opts) {
 		} else if (target) {
 			taskset.run(target)
 				.catch((error) => {
-					console.error(error);
+					reportErrorAndExit(error);
 				});
 
 		} else {
-			throw new Error(`no make target specified`);
+			reportErrorAndExit(`no make target specified`);
 		}
 	};
 	out.desc = () => {
@@ -312,6 +318,42 @@ module.exports.getRelativePath = (abs_path) => {
 
 
 module.exports.newTaskSet = TaskSet;
+
+
+module.exports.publish = (version_level) => {
+	const version_level_labels = [ "major", "minor", "patch" ];
+	const version_level_index  = version_level_labels.indexOf(version_level);
+	if (version_level_index === -1) {
+		throw new Error(`version_level MUST be one of: major, minor, OR patch; not ${version_level}`);
+	}
+	const package_data = JSON.parse(Fs.readFileSync("package.json", {
+		encoding: "utf8",
+	}));
+	const version_split = package_data.version && /^(\d+)\.(\d+)\.(\d+)$/.exec(package_data.version);
+	if (!version_split || version_split.length < 4) {
+		throw new Error(`missing or invalid version number in package.json, MUST be n.n.n, not ${package_data.version}`);
+	}
+	const version_new = [ parseInt(version_split[1], 10), parseInt(version_split[2], 10), parseInt(version_split[3], 10) ];
+	version_new[version_level_index] += 1;
+	if (version_level_index < 2) {
+		version_new[2] = 0;
+	}
+	if (version_level_index < 1) {
+		version_new[1] = 0;
+	}
+	const version_new_str = version_new.join(".");
+	console.log(`setting version number to: ${version_new_str}`);
+	package_data.version = version_new_str;
+	Fs.writeFileSync("package.json", JSON.stringify(package_data, null, 2) + "\n", {
+		encoding: "utf8",
+	});
+	Cp.execSync(`git commit -a -m "${version_level} version click to: ${version_new_str}"`);
+	Cp.execSync(`git tag ${version_new_str}`);
+	Cp.execSync(`git push --tags`);
+	if (package_data.ultimake_settings && package_data.ultimake_settings.exec_on_publish) {
+		Cp.execSync(package_data.ultimake_settings.exec_on_publish);
+	}
+}
 
 
 module.exports.useBuildVars = (build_vars_source, build_vars_target) => {

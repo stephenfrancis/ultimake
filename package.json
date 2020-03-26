@@ -2,7 +2,7 @@
   "main": "src/BuildLib.js",
   "types": "src/Types.d.ts",
   "name": "ultimake",
-  "version": "0.0.6",
+  "version": "0.2.0",
   "description": "Build Tools",
   "engines": {
     "node": "^10.17"
@@ -10,6 +10,7 @@
   "scripts": {
     "coverage": "nyc npm run test",
     "diagnosis": "ava -t --serial src/test.js",
+    "publish": "node src/entry.js publish",
     "test": "ava src/test.js"
   },
   "author": "stephen.d.francis@gmail.com",
@@ -19,6 +20,9 @@
   },
   "license": "ISC",
   "sideEffects": false,
+  "ultimake_settings": {
+    "exec_on_publish": "npm publish --access public"
+  },
   "dependencies": {
     "chalk": "^3.0.0",
     "glob": "^7.1.6",
