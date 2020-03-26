@@ -320,7 +320,13 @@ module.exports.getRelativePath = (abs_path) => {
 module.exports.newTaskSet = TaskSet;
 
 
-module.exports.publish = (version_level) => {
+module.exports.useBuildVars = (build_vars_source, build_vars_target) => {
+	build_vars.source = build_vars_source;
+	build_vars.target = build_vars_target;
+};
+
+
+module.exports.versionClick = (version_level) => {
 	const version_level_labels = [ "major", "minor", "patch" ];
 	const version_level_index  = version_level_labels.indexOf(version_level);
 	if (version_level_index === -1) {
@@ -350,13 +356,7 @@ module.exports.publish = (version_level) => {
 	Cp.execSync(`git commit -a -m "${version_level} version click to: ${version_new_str}"`);
 	Cp.execSync(`git tag ${version_new_str}`);
 	Cp.execSync(`git push --tags`);
-	if (package_data.ultimake_settings && package_data.ultimake_settings.exec_on_publish) {
-		Cp.execSync(package_data.ultimake_settings.exec_on_publish);
+	if (package_data.ultimake_settings && package_data.ultimake_settings.exec_on_version_click) {
+		Cp.execSync(package_data.ultimake_settings.exec_on_version_click);
 	}
 }
-
-
-module.exports.useBuildVars = (build_vars_source, build_vars_target) => {
-	build_vars.source = build_vars_source;
-	build_vars.target = build_vars_target;
-};
