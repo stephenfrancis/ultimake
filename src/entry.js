@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-const BuildLib = require("./BuildLib");
-const yargv = BuildLib.getArgs();
-const target = yargv._ && (yargv._.length > 0) && yargv._[0] || null;
+const Main = require("./main");
+const yargv = Main.getArgs();
+const target = Main.getTarget();
 
 if (target === "version_click") {
-  BuildLib.versionClick(yargv._[1], yargv._[2] || "");
+  Main.versionClick(yargv._[1]);
 }

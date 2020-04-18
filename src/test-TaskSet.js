@@ -126,7 +126,7 @@ test("simple file dependency", async t => {
         taskset.run("foo");
       }, {
         instanceOf: Error,
-        message: "no task identified to make 'foo'",
+        message: "File.make(): no task identified to make 'foo'",
       });
 
       t.throws(() => {

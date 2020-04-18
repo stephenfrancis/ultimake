@@ -14,6 +14,10 @@ Its goal is to help make better builds by:
 
 ## Usage and API
 
+More information and examples of [Use Cases](src/doc-use-cases.md) or
+[Validations and Errors](src/doc-validations-and-errors.md).
+
+
 `npm install --save ultimake`
 
 
@@ -73,28 +77,24 @@ e.g. src/config/build.js:
 ```
 #!/usr/bin/env node
 
-const BuildLib = require("ultimake/BuildLib");
-const { exec, glob, run, task } = BuildLib.getBuildFunctions({
-  build_vars_source: "src/config/BuildVars.json",
-  build_vars_target: "build/vars.json",
-});
+const Ultimake = require("ultimake");
+const { run, task } = Ultimake.getBuildFunctions();
 
 // task(...) = taskset.add(...)
 
-// exec("os command", options); - returns a promise on child_process.exec()
+// Ultimake.exec("os command", options); - returns a promise on child_process.exec()
 
-// glob("src/**/*.ts") = require("glob").sync() - returns an array of strings
+// Ultimake.glob("src/**/*.ts") = require("glob").sync() - returns an array of strings
 
 // run() = taskset.run(cmd line target)
 
-//
 
-const source = glob("src/**/*.ts");
+const source = Ultimake.glob("src/**/*.ts");
 const target = source
   .map(filename => filename.replace(/^src/, "build/").replace(/\.ts$/, ".js"));
 
 task("build", target, source, () => {
-  return exec("tsc");
+  return Ultimake.exec("tsc");
 });
 
 run();

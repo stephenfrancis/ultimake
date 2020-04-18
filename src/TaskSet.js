@@ -75,7 +75,7 @@ class File {
   make(make_stack, counter) {
     const make_task = this.getMakeTask();
     if (!make_task) {
-      throw new Error(`no task identified to make '${this.path}'`);
+      throw new Error(`File.make(): no task identified to make '${this.path}'`);
     }
     this.does_exist = null; // boolean - force these to be re-obtained when next required
     this.last_modified = null; // number
@@ -136,7 +136,7 @@ class Task {
     if (typeof this.recipe !== "function") {
       throw new Error(`Task.execute(): invalid recipe ${this.recipe} for '${this.name}'`);
     }
-    Loggers.Task.warn(`⚒ +${((Date.now() - this.taskset.started_at) / 1000).toFixed(3)}s ${this.name}`);
+    Loggers.Task.warn(`⚒ ${((Date.now() - this.taskset.started_at) / 1000).toFixed(3)}s ${this.name}`);
     const recipeArgs = this.getRecipeArgs();
     return this.recipe(...recipeArgs);
   }
@@ -235,8 +235,8 @@ class Task {
     this.forEachTarget((target) => {
       const file = this.taskset.getFile(target);
       file.getFileData();
-      Loggers.Task.debug(`Task.markCompleted() ${target}, ${file.exists()}, ${this.started_make_at}, ${file.getLastModified()}, ${this.started_make_at - file.getLastModified()}`);
       const time_diff = (file.getLastModified() - this.started_make_at);
+      Loggers.Task.debug(`Task.markCompleted() ${target}, ${file.exists()}, ${this.started_make_at}, ${file.getLastModified()}, ${time_diff}`);
       if (!file.exists() || (time_diff < TIME_DIFF_THRESHOLD)) {
         unmade_targets.push(`${target}, exists? ${file.exists()}, time diff? ${time_diff}s`);
       }

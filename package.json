@@ -1,5 +1,5 @@
 {
-  "main": "src/BuildLib.js",
+  "main": "src/main.js",
   "types": "src/Types.d.ts",
   "name": "ultimake",
   "version": "0.2.2",
@@ -9,11 +9,16 @@
   },
   "scripts": {
     "coverage": "nyc npm run test",
-    "diagnosis": "ava -t --serial src/test.js",
-    "version_click": "node src/entry.js version_click",
-    "test": "ava src/test.js"
+    "diagnosis": "ava -t --serial",
+    "version_click": "src/entry.js version_click",
+    "test": "npx ava"
   },
   "author": "stephen.d.francis@gmail.com",
+  "keywords": [
+    "build",
+    "tools",
+    "cli"
+  ],
   "repository": {
     "type": "git",
     "url": "git@github.com:stephenfrancis/ultimake.git"
@@ -30,7 +35,7 @@
     "yargs": "^15.1.0"
   },
   "devDependencies": {
-    "ava": "^3.5.0",
+    "ava": "^3.7.0",
     "codecov": "^3.6.5",
     "nyc": "^15.0.0"
   }
