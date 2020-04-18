@@ -287,7 +287,7 @@ module.exports.gitCommitAndPush = (commit_msg) => {
 
 module.exports.gitIsClean = () => {
 	const out = module.exports.execSyncToArray("git status");
-	return out && (out.length > 1) && (out[1] === "nothing to commit, working tree clean");
+	return out && (out.length > 3) && (out[3] === "nothing to commit, working tree clean");
 };
 
 
