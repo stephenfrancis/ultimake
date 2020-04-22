@@ -255,6 +255,9 @@ class Task {
 
   // but if a file has a make-task, the file should be made if the make-task actually needs to be made
   needsMakingInternal(earliest_last_modified = null) {
+    if (this.done) {
+      return false;
+    }
     let out = false;
     this.forEachTarget((target) => {
       const file = this.taskset.getFile(target);
