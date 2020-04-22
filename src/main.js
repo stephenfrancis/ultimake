@@ -375,6 +375,7 @@ module.exports.versionClick = (version_level) => {
 	Fs.writeFileSync("package.json", JSON.stringify(package_data, null, 2) + "\n", {
 		encoding: "utf8",
 	});
+	Cp.execSync(`npm install`); // update version number in package-lock.json
 	const commit_msg = `${version_level} version click to: ${version_new_str}`;
 	module.exports.gitCommitAndPush(commit_msg);
 	module.exports.gitTagAndPush(version_new_str);
