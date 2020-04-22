@@ -224,27 +224,27 @@ test("k <- i,j <- g,h; h <- g; file dependency - multi deps", t => {
 
   taskset.add(null, "build/h", "build/g", () => {
     copyFile("build/g", "build/h");
-    return Promise.resolve(null);
+    return sleep(5);
   });
 
   taskset.add(null, [ "build/i", "build/j" ], [ "build/g", "build/h" ], () => {
     copyFile("build/g", "build/i");
     copyFile("build/h", "build/j");
-    return Promise.resolve(null);
+    return sleep(5);
   });
 
   taskset.add(null, "build/k", [ "build/i", "build/j" ], () => {
     copyFile("build/i", "build/k");
-    return Promise.resolve(null);
+    return sleep(5);
   });
 
   let lm_i;
 
   return sleep(10)
-    .then(() => {
+    .then(() => {           // oldest to newest: (h, i, j, k don't exist), g
       return taskset.run("build/k");
     })
-    .then((count) => {
+    .then((count) => {      // now: g, h, i, j, k
       t.is(count, 3, "3 tasks executed");
       t.true(exists("build/h"), "copy g to h");
       t.true(exists("build/i"), "copy g to i");
@@ -254,10 +254,15 @@ test("k <- i,j <- g,h; h <- g; file dependency - multi deps", t => {
       t.true(isNewerThan("build/i", "build/g"), "i is newer than g");
       t.true(isNewerThan("build/j", "build/g"), "j is newer than g");
       t.true(isNewerThan("build/k", "build/g"), "k is newer than g");
+      t.true(isNewerThan("build/i", "build/h"), "i is newer than h");
+      t.true(isNewerThan("build/j", "build/h"), "j is newer than h");
+      t.true(isNewerThan("build/k", "build/h"), "k is newer than h");
+      t.true(isNewerThan("build/k", "build/i"), "k is newer than i");
+      t.true(isNewerThan("build/k", "build/j"), "k is newer than j");
       lm_i = lastMod("build/i");
       return taskset.run("build/i");
     })
-    .then((count) => {
+    .then((count) => {      // still: g, h, i, j, k
       t.is(count, 0, "0 tasks executed");
       // console.log(`${lm_b} === ${Fs.statSync("build/h").mtime.valueOf()}`);
       t.is(lm_i, lastMod("build/i"), "i is unchanged");
@@ -265,29 +270,54 @@ test("k <- i,j <- g,h; h <- g; file dependency - multi deps", t => {
       return sleep(10);
     })
     .then(() => {
-      makeFile("build/i");
+      makeFile("build/i");  // now: g, h, j, k, i
       return taskset.run("build/i");
     })
-    .then((count) => {
+    .then((count) => {      // still: g, h, j, k, i
       t.is(count, 0, "0 tasks executed");
       t.true((lm_i < lastMod("build/i")), "i is unchanged");
       return taskset.run("build/k");
     })
-    .then((count) => {
+    .then((count) => {      // now: g, h, j, i, k
       t.is(count, 1, "1 task executed");
       return sleep(10);
     })
     .then(() => {
-      makeFile("build/g");
+      makeFile("build/g");  // now: h, j, i, k, g
       return sleep(10);
     })
     .then(() => {
       return taskset.run("build/i");
     })
-    .then((count) => {
-      t.is(count, 2, "2 things made - g was older than i");
+    .then((count) => {      // now: k, g, h, i, j
+      t.is(count, 2, "2 things made - g -> h then g, h -> i, j");
       t.true(exists("build/i"), "copy g to i");
-      t.true(isNewerThan("build/i", "build/g"), "i is newer than g");
+      t.true(isNewerThan("build/i", "build/h"), "i is newer than h");
+      t.true(isNewerThan("build/j", "build/h"), "j is newer than h");
+      t.true(isNewerThan("build/h", "build/g"), "h is newer than g");
+      t.true(isNewerThan("build/g", "build/k"), "g is newer than k");
+      return sleep(10);
+    })
+    .then(() => {
+      // prereq-of-prereq scenario - should rebuild k even though it is newer
+      // than its direct prereqs, because one of their prereqs is newer...
+      makeFile("build/k");
+      makeFile("build/h");  // now: g, i, j, k, h
+      t.true(isNewerThan("build/k", "build/i"), "k is newer than i");
+      t.true(isNewerThan("build/k", "build/j"), "k is newer than j");
+      t.true(isNewerThan("build/h", "build/j"), "h is newer than j");
+      return sleep(10);
+    })
+    .then(() => {
+      return taskset.run("build/k");
+    })
+    .then((count) => {      // now: g, h, i, j, k
+      t.is(count, 2, "2 things made - g, h -> i, j then i, j -> k");
+      t.true(isNewerThan("build/h", "build/g"), "h is newer than g");
+      t.true(isNewerThan("build/i", "build/h"), "i is newer than h");
+      t.true(isNewerThan("build/j", "build/h"), "j is newer than h");
+      t.true(isNewerThan("build/k", "build/i"), "k is newer than i");
+      t.true(isNewerThan("build/k", "build/j"), "k is newer than j");
     });
 
 });
@@ -346,28 +376,28 @@ test("multi deps - prereqs as named tasks", t => {
 
   taskset.add("taskT", "build/t", "build/s", () => {
     copyFile("build/s", "build/t");
-    return Promise.resolve(null);
+    return sleep(5);
   });
 
   taskset.add("taskU", [ "build/u", "build/v" ], [ "build/s", "taskT" ], () => {
     copyFile("build/s", "build/u");
     copyFile("build/t", "build/v");
-    return Promise.resolve(null);
+    return sleep(5);
   });
 
   // non-cyclic loop: W <- T, U; U <- T - should be okay
   taskset.add("taskW", "build/w", [ "taskT", "taskU", ], () => {
     copyFile("build/u", "build/w");
-    return Promise.resolve(null);
+    return sleep(5);
   });
 
   let lm_w;
 
   return sleep(10)
-    .then(() => {
+    .then(() => {           // (t, u, v, w), s
       return taskset.run("taskW");
     })
-    .then((count) => {
+    .then((count) => {      // now: s, t, u, v, w
       t.is(count, 3, "3 tasks executed");
       t.true(exists("build/t"), "copy s to t");
       t.true(exists("build/u"), "copy s to u");
@@ -375,12 +405,12 @@ test("multi deps - prereqs as named tasks", t => {
       t.true(exists("build/w"), "copy u to w");
       t.true(isNewerThan("build/t", "build/s"), "t is newer than s");
       t.true(isNewerThan("build/u", "build/s"), "u is newer than s");
-      t.true(isNewerThan("build/v", "build/s"), "v is newer than s");
-      t.true(isNewerThan("build/w", "build/s"), "w is newer than s");
+      t.true(isNewerThan("build/v", "build/t"), "v is newer than t");
+      t.true(isNewerThan("build/w", "build/u"), "w is newer than u");
       lm_w = lastMod("build/w");
       return taskset.run("build/w");
     })
-    .then((count) => {
+    .then((count) => {      // still: s, t, u, v, w
       t.is(count, 0, "0 tasks executed");
       // console.log(`${lm_b} === ${Fs.statSync("build/h").mtime.valueOf()}`);
       t.is(lm_w, lastMod("build/w"), "w is unchanged");

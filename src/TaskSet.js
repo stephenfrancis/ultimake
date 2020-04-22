@@ -86,16 +86,24 @@ class File {
 
   // a File should be made if: (a) it doesn't exist, or (b) it is older than its dependencies, as defined by its make_task
   needsMaking() {
+    return this.needsMakingInternal();
+  }
+
+
+  needsMakingInternal(earliest_last_modified) {
+    const TIME_DIFF_THRESHOLD = 5; // millis
     let out = false;
     if (!this.exists()) {
+      out = true;
+    } else if (earliest_last_modified && ((this.getLastModified() - earliest_last_modified) > TIME_DIFF_THRESHOLD)) {
       out = true;
     } else {
       const make_task = this.getMakeTask();
       if (make_task && !this.made) {
-        out = !make_task.isMoreRecentThanAnyPrerequisites(this.last_modified);
+        out = make_task.needsMakingInternal(earliest_last_modified);
       }
     }
-    Loggers.File.info(`File.needsMaking() '${this.path}', exists? ${this.exists()}, lm? ${this.last_modified} => ${out}`);
+    Loggers.File.info(`File.needsMakingInternal() '${this.path}', exists? ${this.exists()}, lm? ${this.last_modified} => ${out}`);
     return out;
   }
 
@@ -181,17 +189,6 @@ class Task {
   }
 
 
-  isMoreRecentThanAnyPrerequisites(last_modified) {
-    const TIME_DIFF_THRESHOLD = -5; // millis
-    let out = true;
-    this.taskset.forEachPrereq((task_or_file) => {
-      out = out && ((last_modified - task_or_file.getLastModified()) > TIME_DIFF_THRESHOLD);
-      Loggers.Task.debug(`Task.isMoreRecentThanAnyPrerequisites(${last_modified}) ${this.name} ? ${task_or_file.getLastModified()} => ${out}`);
-    }, this.prereqs_raw);
-    return out;
-  }
-
-
   make(make_stack, counter) {
     make_stack = make_stack || [];
     counter    = counter    || { count: 0 };
@@ -249,8 +246,32 @@ class Task {
   }
 
 
+  // if a task is referenced as a prerequisite directly (via its task name) then it should ALWAYS
+  // be made if it hasn't already been in that run
   needsMaking() {
     return !this.isCompleted();
+  }
+
+
+  // but if a file has a make-task, the file should be made if the make-task actually needs to be made
+  needsMakingInternal(earliest_last_modified = null) {
+    let out = false;
+    this.forEachTarget((target) => {
+      const file = this.taskset.getFile(target);
+      if (!file.exists()) {
+        out = true;
+      } else if (!earliest_last_modified || earliest_last_modified > file.getLastModified()) {
+        earliest_last_modified = file.getLastModified();
+      }
+    });
+    if (out) {
+      return true;
+    }
+    this.taskset.forEachPrereq((task_or_file) => {
+      out = out || task_or_file.needsMakingInternal(earliest_last_modified);
+    }, this.prereqs_raw);
+    Loggers.Task.debug(`Task.needsMakingInternal(${earliest_last_modified}) ${this.name} => ${out}`);
+    return out;
   }
 
 
