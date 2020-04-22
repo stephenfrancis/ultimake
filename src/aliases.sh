@@ -1,5 +1,5 @@
 
-alias um="src/config/build.js"
+alias um="src/config/make.js"
 alias mkc="um clean"
 alias mkb="um build"
 alias mkt="um test"
