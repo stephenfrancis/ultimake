@@ -4,8 +4,8 @@ const Cp   = require("child_process");
 const Fs   = require("fs");
 const TaskSet = require("./TaskSet");
 
-// TaskSet.setLogLevel("SILENT"); // set to DEBUG for diagnosis
-TaskSet.setLogLevel("DEBUG"); // set to DEBUG for diagnosis
+TaskSet.setLogLevel("SILENT"); // comment for diagnosis
+// TaskSet.setLogLevel("DEBUG"); // uncomment for diagnosis
 
 function copyFile(from, to) {
   Fs.copyFileSync(from, to);
@@ -30,7 +30,7 @@ function isNewerThan(a, b) {
 
 function lastMod(name) {
   return Fs.statSync(name, {
-    bigint: true,
+    // bigint: true,
   }).mtimeMs;
 }
 
@@ -87,7 +87,7 @@ test("simple file dependency", async t => {
       t.is(count, 1, "1 tasks executed");
       t.true(exists("build/b"), "copy a to b");
       t.true(isNewerThan("build/b", "build/a"), "b is newer than a");
-      t.true(typeof task.getLastModified() === "number" && task.getLastModified() > lastMod("build/a"), "task last modified date");
+      t.true((typeof task.getLastModified() === "number") && task.getLastModified() > lastMod("build/a"), "task last modified date");
       t.is(task, task.getMakeTask(), "a task's make-task is itself");
       t.true(task.isCompleted(), "task is marked as completed");
       t.true(!task.needsMaking(), "task is marked not needing making");
@@ -362,8 +362,8 @@ test("unmade targets", t => {
     })
     .catch((error) => {
       t.regex(error.message, /Task\.markCompleted\(\) 'rule: build\/q \+ 1 other' failed to make targets: /);
-      t.regex(error.message, /build\/q, exists\? false, time diff\? -\d{13}s/);
-      t.regex(error.message, /build\/r, exists\? false, time diff\? -\d{13}s/);
+      t.regex(error.message, /build\/q \[exists\? false, time diff: -\d{13}ms\]/);
+      t.regex(error.message, /build\/r \[exists\? false, time diff: -\d{13}ms\]/);
     });
 });
 

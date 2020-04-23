@@ -37,7 +37,9 @@ class File {
 
   getFileData() { // private
     try {
-      const stats = Fs.statSync(this.path);
+      const stats = Fs.statSync(this.path, {
+        // bigint: true,
+      });
       this.does_exist = true;
       this.last_modified = stats.mtimeMs;
       Loggers.File.debug(`File.getFileData(${this.path}) => exists, lm ${this.last_modified}`);
@@ -81,11 +83,8 @@ class File {
   make(make_stack, counter) {
     const make_task = this.getMakeTask();
     if (!make_task) {
-      return;
-      // throw new Error(`File.make(): no task identified to make '${this.path}'`);
+      throw new Error(`File.make(): no task identified to make '${this.path}'`);
     }
-    this.does_exist = null; // boolean - force these to be re-obtained when next required
-    this.last_modified = null; // number
     Loggers.File.debug(`File.make() ${this.path} calling make() for ${make_task.name}`);
     return make_task.make(make_stack, counter);
   }
@@ -97,13 +96,11 @@ class File {
   }
 
 
-  // a File should be made if: (a) it doesn't exist, or (b) it is older than its dependencies, as defined by its make_task
-  needsMaking() {
-    if (!this.exists()) {
-      return true;
-    }
-    return !!this.getMakeTask();
+  reset() {
+    this.does_exist = null; // boolean - force these to be re-obtained when next required
+    this.last_modified = null; // number
   }
+
 }
 
 
@@ -161,6 +158,21 @@ class Task {
   }
 
 
+  // null means no targets; 0 means absent target; otherwise is a unix timestamp
+  getEarliestTargetLastModified() {
+    let out = null;
+    this.forEachTarget((target) => {
+      const file = this.taskset.getFile(target);
+      if (!file.exists()) {
+        out = 0;
+      } else if ((out === null) || out > file.getLastModified()) {
+        out = file.getLastModified();
+      }
+    });
+    return out;
+  }
+
+
   getLastModified() {
     return this.finished_make_at;
   }
@@ -173,6 +185,22 @@ class Task {
 
   getName() {
     return this.name;
+  }
+
+
+  getOlderTargetsThan(reference_time) {
+    const TIME_DIFF_THRESHOLD = -15; // millis
+    const older_targets = [];
+    this.forEachTarget((target) => {
+      const file = this.taskset.getFile(target);
+      file.reset();
+      const time_diff = (file.getLastModified() - reference_time);
+      Loggers.Task.debug(`Task.getOlderTargets() ${target}, ${file.exists()}, ${this.started_make_at}, ${file.getLastModified()}, ${time_diff}`);
+      if (!file.exists() || (time_diff < TIME_DIFF_THRESHOLD)) {
+        older_targets.push(`${target} [exists? ${file.exists()}, time diff: ${time_diff}ms]`);
+      }
+    });
+    return older_targets;
   }
 
 
@@ -204,78 +232,51 @@ class Task {
     make_stack.push(this.name);
     Loggers.Task.debug(`Task.make() ${this.name}, count: ${counter.count}, make_stack: ${make_stack}`);
     this.taskset.forEachPrereq((task_or_file) => {
-      promises.push(task_or_file.make(make_stack.slice(), counter, (task_or_file instanceof Task))); // for each prereq branch
-      if (typeof task_or_file.mustExecute() !== "boolean") {
-        throw new Error(`Task.make() Task(${task_or_file.name}).mustExecute() not boolean`);
+      const prereq_task = task_or_file.getMakeTask();
+      if (prereq_task) {
+        promises.push(task_or_file.make(make_stack.slice(), counter, (task_or_file instanceof Task))); // for each prereq branch
+        if (typeof task_or_file.mustExecute() !== "boolean") {
+          throw new Error(`Task.make() Task(${task_or_file.name}).mustExecute() not boolean`);
+        }
+        this.must_execute = this.must_execute || task_or_file.mustExecute();
       }
-      this.must_execute = this.must_execute || task_or_file.mustExecute();
     }, this.prereqs_raw);
 
-    this.must_execute = this.must_execute || this.needsMakingInternal();
-
+    this.must_execute = this.must_execute || this.needsMaking();
     Loggers.Task.debug(`Task.make() ${this.name}, count: ${counter.count}, executing?: ${this.must_execute}`);
 
-    this.make_promise = Promise.all(promises)
-      .then(() => {
-        if (this.must_execute) {
-          this.started_make_at = Date.now();
+    this.make_promise = Promise.all(promises);
+    if (this.must_execute) {
+      this.make_promise = this.make_promise
+        .then(() => {
+          this.started_make_at = Date.now(); // process.hrtime.bigint();
           return this.execute();
-        }
-      })
-      .then(() => {
-        if (this.must_execute) {
+        })
+        .then(() => {
           counter.count += 1;
           this.markCompleted();
-        }
-      });
+        });
+    }
     return this.make_promise;
   }
 
 
   markCompleted() {
-    const TIME_DIFF_THRESHOLD = -15; // millis
-    const unmade_targets = [];
-    this.forEachTarget((target) => {
-      const file = this.taskset.getFile(target);
-      file.getFileData();
-      const time_diff = (file.getLastModified() - this.started_make_at);
-      Loggers.Task.debug(`Task.markCompleted() ${target}, ${file.exists()}, ${this.started_make_at}, ${file.getLastModified()}, ${time_diff}`);
-      if (!file.exists() || (time_diff < TIME_DIFF_THRESHOLD)) {
-        unmade_targets.push(`${target}, exists? ${file.exists()}, time diff? ${time_diff}s`);
-      }
-    });
+    const unmade_targets = this.getOlderTargetsThan(this.started_make_at);
     if (unmade_targets.length > 0) {
       throw new Error(`Task.markCompleted() '${this.name}' failed to make targets: ${unmade_targets.join("; ")}`);
     }
-    this.finished_make_at = Date.now();
+    this.finished_make_at = Date.now(); // process.hrtime.bigint();
     this.done = true;
   }
 
 
-  // if a task is referenced as a prerequisite directly (via its task name) then it should ALWAYS
-  // be made if it hasn't already been in that run
+  mustExecute() {
+    return this.must_execute;
+  }
+
+
   needsMaking() {
-    return !this.isCompleted();
-  }
-
-
-  // null means no targets; 0 means absent target; otherwise is a unix timestamp
-  getEarliestTargetLastModified() {
-    let out = null;
-    this.forEachTarget((target) => {
-      const file = this.taskset.getFile(target);
-      if (!file.exists()) {
-        out = 0;
-      } else if ((out === null) || out > file.getLastModified()) {
-        out = file.getLastModified();
-      }
-    });
-    return out;
-  }
-
-
-  // but if a file has a make-task, the file should be made if the make-task actually needs to be made
-  needsMakingInternal() {
     if (this.done) {
       return false;
     }
@@ -290,7 +291,7 @@ class Task {
     this.taskset.forEachPrereq((task_or_file) => {
       out = out || ((task_or_file instanceof File) && task_or_file.existsAndIsNewerThan(earliest_target));
     }, this.prereqs_raw);
-    Loggers.Task.debug(`Task.needsMakingInternal(${earliest_target}) ${this.name} => ${out}`);
+    Loggers.Task.debug(`Task.needsMaking(${earliest_target}) ${this.name} => ${out}`);
     return out;
   }
 
@@ -312,11 +313,6 @@ class Task {
       return (this.targets_raw === path);
     }
     return (this.targets_raw.indexOf(path) > -1);
-  }
-
-
-  mustExecute() {
-    return this.must_execute;
   }
 
 }
