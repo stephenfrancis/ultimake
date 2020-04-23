@@ -5,6 +5,9 @@ const Fs   = require("fs");
 const main = require("./main");
 
 
+Cp.execSync("rm -f build/vars.json");
+
+
 test("basedir", async t => {
   t.is(main.basedir("foo"), "", "basedir(foo)");
   t.is(main.basedir("foo/"), "foo", "basedir(foo/)");

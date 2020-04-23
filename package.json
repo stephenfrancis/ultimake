@@ -9,7 +9,7 @@
   },
   "scripts": {
     "coverage": "nyc npm run test",
-    "diagnosis": "ava -t --serial",
+    "diagnosis": "ava -t -v --serial",
     "version_click": "src/entry.js version_click",
     "test": "npx ava"
   },

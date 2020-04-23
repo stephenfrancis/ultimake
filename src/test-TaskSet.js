@@ -4,14 +4,15 @@ const Cp   = require("child_process");
 const Fs   = require("fs");
 const TaskSet = require("./TaskSet");
 
-TaskSet.setLogLevel("SILENT"); // set to DEBUG for diagnosis
+// TaskSet.setLogLevel("SILENT"); // set to DEBUG for diagnosis
+TaskSet.setLogLevel("DEBUG"); // set to DEBUG for diagnosis
 
 function copyFile(from, to) {
   Fs.copyFileSync(from, to);
 }
 
 function deleteAll() {
-  Cp.execSync("rm -f build/*");
+  Cp.execSync("rm -f build/[a-z]");
 }
 
 function exists(name) {
@@ -126,9 +127,10 @@ test("simple file dependency", async t => {
         taskset.run("foo");
       }, {
         instanceOf: Error,
-        message: "File.make(): no task identified to make 'foo'",
+        message: "TaskSet.run(foo): no task identified to make file",
       });
 
+      taskset.run("build/b");
       t.throws(() => {
         taskset.run("foo");
       }, {
@@ -411,9 +413,10 @@ test("multi deps - prereqs as named tasks", t => {
       return taskset.run("build/w");
     })
     .then((count) => {      // still: s, t, u, v, w
-      t.is(count, 0, "0 tasks executed");
+      t.is(count, 3, "3 tasks executed - specified by task name rather than file name");
       // console.log(`${lm_b} === ${Fs.statSync("build/h").mtime.valueOf()}`);
-      t.is(lm_w, lastMod("build/w"), "w is unchanged");
+      t.true((lm_w < lastMod("build/w")), "w is changed");
+      lm_w = lastMod("build/w");
 
       return sleep(10);
     })

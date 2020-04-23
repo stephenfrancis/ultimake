@@ -29,6 +29,12 @@ class File {
   }
 
 
+  existsAndIsNewerThan(last_modified) {
+    const TIME_DIFF_THRESHOLD = 5; // millis
+    return this.exists() && ((this.getLastModified() - last_modified) > TIME_DIFF_THRESHOLD);
+  }
+
+
   getFileData() { // private
     try {
       const stats = Fs.statSync(this.path);
@@ -75,7 +81,8 @@ class File {
   make(make_stack, counter) {
     const make_task = this.getMakeTask();
     if (!make_task) {
-      throw new Error(`File.make(): no task identified to make '${this.path}'`);
+      return;
+      // throw new Error(`File.make(): no task identified to make '${this.path}'`);
     }
     this.does_exist = null; // boolean - force these to be re-obtained when next required
     this.last_modified = null; // number
@@ -84,29 +91,19 @@ class File {
   }
 
 
+  mustExecute() {
+    const make_task = this.getMakeTask();
+    return !!make_task && make_task.mustExecute();
+  }
+
+
   // a File should be made if: (a) it doesn't exist, or (b) it is older than its dependencies, as defined by its make_task
   needsMaking() {
-    return this.needsMakingInternal();
-  }
-
-
-  needsMakingInternal(earliest_last_modified) {
-    const TIME_DIFF_THRESHOLD = 5; // millis
-    let out = false;
     if (!this.exists()) {
-      out = true;
-    } else if (earliest_last_modified && ((this.getLastModified() - earliest_last_modified) > TIME_DIFF_THRESHOLD)) {
-      out = true;
-    } else {
-      const make_task = this.getMakeTask();
-      if (make_task && !this.made) {
-        out = make_task.needsMakingInternal(earliest_last_modified);
-      }
+      return true;
     }
-    Loggers.File.info(`File.needsMakingInternal() '${this.path}', exists? ${this.exists()}, lm? ${this.last_modified} => ${out}`);
-    return out;
+    return !!this.getMakeTask();
   }
-
 }
 
 
@@ -189,7 +186,7 @@ class Task {
   }
 
 
-  make(make_stack, counter) {
+  make(make_stack, counter, must_execute) {
     make_stack = make_stack || [];
     counter    = counter    || { count: 0 };
     if (make_stack.indexOf(this.name) > -1) {
@@ -201,26 +198,35 @@ class Task {
     if (this.done) {
       throw new Error(`Task.make() '${this.name}' has already been done`);
     }
-    this.make_promise = Promise.resolve()
+
+    const promises = [];
+    this.must_execute = !!must_execute;
+    make_stack.push(this.name);
+    Loggers.Task.debug(`Task.make() ${this.name}, count: ${counter.count}, make_stack: ${make_stack}`);
+    this.taskset.forEachPrereq((task_or_file) => {
+      promises.push(task_or_file.make(make_stack.slice(), counter, (task_or_file instanceof Task))); // for each prereq branch
+      if (typeof task_or_file.mustExecute() !== "boolean") {
+        throw new Error(`Task.make() Task(${task_or_file.name}).mustExecute() not boolean`);
+      }
+      this.must_execute = this.must_execute || task_or_file.mustExecute();
+    }, this.prereqs_raw);
+
+    this.must_execute = this.must_execute || this.needsMakingInternal();
+
+    Loggers.Task.debug(`Task.make() ${this.name}, count: ${counter.count}, executing?: ${this.must_execute}`);
+
+    this.make_promise = Promise.all(promises)
       .then(() => {
-        const promises = [];
-        this.started_make_at = Date.now();
-        make_stack.push(this.name);
-        Loggers.Task.debug(`Task.make() make_stack: ${make_stack}`);
-        Loggers.Task.info(`Task.make() ${this.name}`);
-        this.taskset.forEachPrereq((task_or_file) => {
-          if (task_or_file.needsMaking()) { // use slice() to shallow-copy the make_stack array
-            promises.push(task_or_file.make(make_stack.slice(), counter)); // for each prereq branch
-          }
-        }, this.prereqs_raw);
-        return Promise.all(promises);
+        if (this.must_execute) {
+          this.started_make_at = Date.now();
+          return this.execute();
+        }
       })
       .then(() => {
-        return this.execute();
-      })
-      .then(() => {
-        counter.count += 1;
-        this.markCompleted();
+        if (this.must_execute) {
+          counter.count += 1;
+          this.markCompleted();
+        }
       });
     return this.make_promise;
   }
@@ -253,27 +259,38 @@ class Task {
   }
 
 
-  // but if a file has a make-task, the file should be made if the make-task actually needs to be made
-  needsMakingInternal(earliest_last_modified = null) {
-    if (this.done) {
-      return false;
-    }
-    let out = false;
+  // null means no targets; 0 means absent target; otherwise is a unix timestamp
+  getEarliestTargetLastModified() {
+    let out = null;
     this.forEachTarget((target) => {
       const file = this.taskset.getFile(target);
       if (!file.exists()) {
-        out = true;
-      } else if (!earliest_last_modified || earliest_last_modified > file.getLastModified()) {
-        earliest_last_modified = file.getLastModified();
+        out = 0;
+      } else if ((out === null) || out > file.getLastModified()) {
+        out = file.getLastModified();
       }
     });
-    if (out) {
+    return out;
+  }
+
+
+  // but if a file has a make-task, the file should be made if the make-task actually needs to be made
+  needsMakingInternal() {
+    if (this.done) {
+      return false;
+    }
+    const earliest_target = this.getEarliestTargetLastModified();
+    if (earliest_target === null) {
+      return false;
+    }
+    if (earliest_target === 0) {
       return true;
     }
+    let out = false;
     this.taskset.forEachPrereq((task_or_file) => {
-      out = out || task_or_file.needsMakingInternal(earliest_last_modified);
+      out = out || ((task_or_file instanceof File) && task_or_file.existsAndIsNewerThan(earliest_target));
     }, this.prereqs_raw);
-    Loggers.Task.debug(`Task.needsMakingInternal(${earliest_last_modified}) ${this.name} => ${out}`);
+    Loggers.Task.debug(`Task.needsMakingInternal(${earliest_target}) ${this.name} => ${out}`);
     return out;
   }
 
@@ -281,6 +298,7 @@ class Task {
   reset() {
     this.done = false;
     this.make_promise = null;
+    this.must_execute = null;
     this.started_make_at = null;
     this.finished_make_at = null;
   }
@@ -294,6 +312,11 @@ class Task {
       return (this.targets_raw === path);
     }
     return (this.targets_raw.indexOf(path) > -1);
+  }
+
+
+  mustExecute() {
+    return this.must_execute;
   }
 
 }
@@ -411,13 +434,15 @@ class TaskSet {
       this.reset();
     }
 
-    const makeThing = (thing) => {
+    Loggers.TaskSet.info(`TaskSet.run(${name})...`);
+
+    const makeThing = (thing, must_execute) => {
       this.run_status = 1;
       this.started_at = Date.now();
       const counter = {
         count: 0,
       };
-      return thing.make(null, counter)
+      return thing.make(null, counter, must_execute)
         .then(() => {
           this.run_status = 2;
           return counter.count;
@@ -426,16 +451,15 @@ class TaskSet {
 
     const task = this.getTask(name);
     if (task) {
-      Loggers.TaskSet.info(`TaskSet.run(${name}) - identified as a task`);
-      return makeThing(task);
+      Loggers.TaskSet.info(`TaskSet.run(${name}): identified as a task`);
+      return makeThing(task, true);
     }
     const file = this.getFile(name);
-    if (file.needsMaking()) {
-      Loggers.TaskSet.info(`TaskSet.run(${name}) - assumed to be a file that needs making`);
-      return makeThing(file);
+    if (!file.getMakeTask()) {
+      throw new Error(`TaskSet.run(${name}): no task identified to make file`);
     } else {
-      Loggers.TaskSet.info(`TaskSet.run(${name}) - assumed to be a file that does not need making`);
-      return Promise.resolve(0);
+      Loggers.TaskSet.info(`TaskSet.run(${name}): identified as a file with a make-task`);
+      return makeThing(file);
     }
   }
 
