@@ -29,6 +29,8 @@ export type  RunFunction = () => void;
 export type TaskFunction = (name: string, target: string | string[], prerequisites: string | string[],
                             recipe: RecipeFunction, options?: TaskOptions) => Task;
 
+export type VersionLevel = "major" | "minor" | "patch";
+
 export declare class Task {
   description: (descr: string) => void;
 }
@@ -52,28 +54,64 @@ export declare class TaskSet {
 
 declare module "ultimake" {
 
-  function basedir(path: string): string;
+  export function basedir(path: string): string;
 
-  function convertSourceToTarget(source_prefix: string, target_prefix: string, from_suffix: string, to_suffix: string): (from: string) => string;
+  export function calcBuildVarsFromEnv(build_vars_orig: any, env: string): any;
 
-  function convert(regex: RegExp, prefix: string, suffix: string): (from: string) => string;
+  export function calcPathBuildVars(build_vars: any): void;
 
-  function createDir(path: string): void;
+  export function convertSourceToTarget(source_prefix: string, target_prefix: string, from_suffix: string, to_suffix: string): (from: string) => string;
 
-  function exec(os_cmd: string, options?: ExecOptions): Promise<void>;
+  export function convert(regex: RegExp, prefix: string, suffix: string): (from: string) => string;
 
-  function execSync(cmd: string, options?: ExecOptions): string[];
+  export function createBuildVarsFile(build_vars_source_file: string): void;
 
-  function execSyncLogOutput(cmd: string, options?: ExecOptions): void;
+  export function createDir(path: string): void;
 
-  function getArgs(): any;
+  export function exec(os_cmd: string, options?: ExecOptions): Promise<void>;
 
-  function getBuildFunctions(opts): { exec: ExecFunction, glob: GlobFunction, run: RunFunction, task: TaskFunction };
+  export function execSync(cmd: string, options?: ExecOptions): void;
 
-  function getRelativePath(abs_path: string): string;
+  export function execSyncToArray(cmd: string, options?: ExecOptions): string[];
 
-  function newTaskSet(): TaskSet;
+  export function execSyncLogOutput(cmd: string, options?: ExecOptions): void;
 
-  function useBuildVars(build_vars_source: string, build_vars_target: string): void;
+  export function getArgs(): any;
+
+  export function getBuildFunctions(): { exec: ExecFunction, glob: GlobFunction, run: RunFunction, task: TaskFunction };
+
+  export function getGitBranch(): string;
+
+  export function getJSONFileData(json_file: string): any;
+
+  export function getRelativePath(abs_path: string): string;
+
+  export function getTarget(): string;
+
+  export function gitCommitAndPush(commit_msg: string): void;
+
+  export function gitIsClean(): boolean;
+
+  export function gitTagAndPush(version_new_str: string): void;
+
+  export function glob(pattern: string): string[];
+
+  export function newTaskSet(): TaskSet;
+
+  export function setAllowedEnvs(new_array: string[]): void;
+
+  export function setBranchValidationRegExp(new_regexp: RegExp): void;
+
+  export function setBuildVarsFile(arg: string): void;
+
+  export function setEnvVarsPrefix(new_prefix: string): void;
+
+  export function validateBranchName(branch: string): void;
+
+  export function validateExistingVars(data: any, env: string, branch: string): void;
+
+  export function versionClick(version_level: VersionLevel): void;
+
+  export function writeBuildVars(build_vars_file: string, data: any): void;
 
 }
