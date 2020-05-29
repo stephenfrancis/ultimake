@@ -26,13 +26,17 @@ export type GlobFunction = (pattern: string, options?: any) => string[];
 
 export type  RunFunction = () => void;
 
-export type TaskFunction = (name: string, target: string | string[], prerequisites: string | string[],
+export type TaskFunction = (name: string, target: string | string[], prerequisites: string | (string | string[])[],
                             recipe: RecipeFunction, options?: TaskOptions) => Task;
 
 export type VersionLevel = "major" | "minor" | "patch";
 
 export declare class Task {
-  description: (descr: string) => void;
+
+  desc: (descr: string) => string;
+
+  description: (descr: string) => string;
+
 }
 
 export declare class TaskSet {
