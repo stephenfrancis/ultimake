@@ -63,17 +63,17 @@ test("simple file dependency", async t => {
     copyFile("build/a", "build/b");
     t.is(targets_raw, "build/b", "0th arg of recipe - targets");
     t.is(prereqs_raw, "build/a", "1st arg of recipe - prereqs");
-    t.is(name, "rule: build/b" , "2nd arg of recipe - name");
+    t.is(name, "file: build/b" , "2nd arg of recipe - name");
     return Promise.resolve(null);
   });
 
   t.is(taskset.getFile("build/a").getPath(), "build/a");
-  t.is(task.getName(), "rule: build/b");
-  t.is(task.descr, undefined);
+  t.is(task.getName(), "file: build/b");
+  t.is(task.desc(), undefined);
   task.desc("foo");
-  t.is(task.descr, "foo");
+  t.is(task.desc(), "foo");
   task.description("bar");
-  t.is(task.descr, "bar");
+  t.is(task.desc(), "bar");
   t.true(!task.isCompleted(), "task is marked as not completed");
   t.true(task.needsMaking(), "task is marked as needing making");
 
@@ -160,19 +160,19 @@ test("2 <- 2 file dependency", async t => {
   makeFile("build/d");
   // const lm_a = Fs.statSync("build/c").mtime;
 
-  const task = taskset.add(null, [ "build/e", "build/f" ], [ "build/c", "build/d" ], () => {
+  const task = taskset.add("build", [ "build/e", "build/f" ], [ "build/c", "build/d" ], () => {
     copyFile("build/c", "build/e");
     copyFile("build/d", "build/f");
     return Promise.resolve(null);
   });
 
-  t.is(task.getName(), "rule: build/e + 1 other");
+  t.is(task.getName(), "build");
 
   let lm_c;
 
   return sleep(10)
     .then(() => {
-      return taskset.run("build/e");
+      return taskset.run("build"); // invoke task by name
     })
     .then((count) => {
       t.is(count, 1, "1 task executed");
@@ -343,7 +343,7 @@ test("p <- n <- m <- p; dependency circularity", t => {
       t.fail("should have thrown");
     })
     .catch((error) => {
-      t.is(error.message, "Task.make() \'rule: build/p\' RECURSION, stack: rule: build/p,rule: build/n,rule: build/m");
+      t.is(error.message, "Task.make() \'file: build/p\' RECURSION, stack: file: build/p,file: build/n,file: build/m");
     });
 });
 
@@ -361,7 +361,7 @@ test("unmade targets", t => {
       t.fail("should have thrown");
     })
     .catch((error) => {
-      t.regex(error.message, /Task\.markCompleted\(\) 'rule: build\/q \+ 1 other' failed to make targets: /);
+      t.regex(error.message, /Task\.markCompleted\(\) 'file: build\/q \+ 1 other' failed to make targets: /);
       t.regex(error.message, /build\/q \[exists\? false, time diff: -\d{13}ms\]/);
       t.regex(error.message, /build\/r \[exists\? false, time diff: -\d{13}ms\]/);
     });
@@ -516,10 +516,10 @@ test("general validation", t => {
   });
 
   const task2 = taskset.add(null, [ "b", "c", "d", "e" ], null, () => {});
-  t.is(task2.getName(), "rule: b + 3 others");
+  t.is(task2.getName(), "file: b + 3 others");
 
   const task3 = taskset.add(null, [ "a" ], null, () => {});
-  t.is(task3.getName(), "rule: a");
+  t.is(task3.getName(), "file: a");
 
 });
 

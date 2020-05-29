@@ -38,7 +38,7 @@ More information and examples of [Use Cases](src/doc-use-cases.md) or
 
     "task title",                 // task title is optional - leave null if you like
                                   // - but then target is REQUIRED and task name is
-                                  //   generated as "rule: " + target name
+                                  //   generated as "file: " + target name
 
     "path/to/target/file",        // target is optional UNLESS task title is null
                                   // - target can be a string (relative file path)

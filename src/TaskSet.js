@@ -62,7 +62,7 @@ class File {
     if (this.make_task) {
       return this.make_task;
     }
-    this.make_task = this.taskset.getTask("rule: " + this.path);
+    this.make_task = this.taskset.getTask("file: " + this.path);
     if (!this.make_task) {
       this.taskset.forEachTask((task) => {
         if (!this.make_task && task.targetMatches(this.path)) {
@@ -109,19 +109,24 @@ class File {
 class Task {
 
   constructor(taskset, name, targets_raw, prereqs_raw, recipe, options) {
-    this.descr       = options && options.description;
+    this.options     = options || {};
     this.done        = false;
     this.name        = name;
     this.prereqs_raw = prereqs_raw;
     this.recipe      = recipe;
     this.targets_raw = targets_raw;
     this.taskset     = taskset;
-    Loggers.Task.info(`new Task(${name}, ${targets_raw}, ${prereqs_raw})`);
+    Loggers.Task.debug(`new Task(${name}, ${targets_raw}, ${prereqs_raw})`);
   }
 
 
   desc(str) {
-    this.descr = str;
+    if (str === undefined) {
+      return this.options.description;
+    } else if (typeof str !== "string") {
+      throw new Error(`Task.desc() argument must be a string, is ${typeof str}`);
+    }
+    this.options.description = str;
   }
 
 
@@ -331,13 +336,16 @@ class TaskSet {
     if ((typeof name !== "string" || !name) && (!targets_raw || targets_raw.length === 0)) {
       throw new Error("TaskSet.add(): no task name nor targets");
     }
+    // if (name === "build") {
+    //   throw new Error("TaskSet.add(): 'build' is not a valid task name any more");
+    // }
     if (Array.isArray(targets_raw) && targets_raw.length > 0 && !targets_raw[0]) {
       throw new Error(`TaskSet.add(): invalid first target: ${targets_raw}`);
     }
     if (typeof recipe !== "function") {
       throw new Error("TaskSet.add(): a recipe function is required");
     }
-    name = name || "rule: " + (
+    name = name || "file: " + (
       (typeof targets_raw === "string") ? targets_raw :
         (targets_raw[0] + (
           (targets_raw.length === 2) ? " + 1 other" :
@@ -407,10 +415,21 @@ class TaskSet {
     Object.keys(this.all_tasks)
       .sort()
       .forEach((task_name) => {
-        console.log(` ${task_name}${" ".repeat(max_name_length - task_name.length + 2)}${this.all_tasks[task_name].descr || ""}`)
-      })
+        console.log(` ${task_name}${" ".repeat(max_name_length - task_name.length + 2)}${this.all_tasks[task_name].options.description || ""}`)
+      });
   }
 
+/*
+  make(make_stack, counter, must_execute) { // built-in "build" task
+    const task_make_promises = [];
+    this.forEachTask((task) => {
+      if (task.targets_raw && !task.options.exclude_from_build) {
+        task_make_promises.push(task.make(make_stack, counter, must_execute));
+      }
+    });
+    return Promise.all(task_make_promises);
+  }
+*/
 
   reset() {
     Loggers.TaskSet.info(`TaskSet.reset()`);
@@ -445,6 +464,10 @@ class TaskSet {
         });
     }
 
+    // if (name === "build") {
+    //   Loggers.TaskSet.info(`TaskSet.run(${name}): identified as the build task`);
+    //   return makeThing(this);
+    // }
     const task = this.getTask(name);
     if (task) {
       Loggers.TaskSet.info(`TaskSet.run(${name}): identified as a task`);
@@ -453,10 +476,9 @@ class TaskSet {
     const file = this.getFile(name);
     if (!file.getMakeTask()) {
       throw new Error(`TaskSet.run(${name}): no task identified to make file`);
-    } else {
-      Loggers.TaskSet.info(`TaskSet.run(${name}): identified as a file with a make-task`);
-      return makeThing(file);
     }
+    Loggers.TaskSet.info(`TaskSet.run(${name}): identified as a file with a make-task`);
+    return makeThing(file);
   }
 
 
