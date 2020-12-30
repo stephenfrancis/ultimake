@@ -1,17 +1,19 @@
-
 const test = require("ava");
-const Cp   = require("child_process");
-const Fs   = require("fs");
+const Cp = require("child_process");
+const Fs = require("fs");
 const TaskSet = require("./TaskSet");
 
 TaskSet.setLogLevel("SILENT"); // set to DEBUG for diagnosis
 
-Cp.execSync("rm -f build/vol*");
-
-
 function copyFile(from, to) {
   Fs.copyFileSync(from, to);
 }
+
+function deleteVolumeFiles() {
+  Cp.execSync("find build/ -name 'vol*' -type f -delete");
+}
+
+deleteVolumeFiles();
 
 function makeFile(name) {
   const data = String(Date.now()) + "-" + String(Math.random() * 10e12);
@@ -20,9 +22,7 @@ function makeFile(name) {
   });
 }
 
-
 function makeLevel(taskset, level, max_level, target) {
-
   const prereqs = [];
 
   for (let i = 0; i < 10; i += 1) {
@@ -37,21 +37,17 @@ function makeLevel(taskset, level, max_level, target) {
   taskset.add(null, target, prereqs, () => {
     copyFile(prereqs[0], target);
   });
-
 }
 
-
-test("large volume", async t => {
-
+test("large volume", async (t) => {
   const taskset = TaskSet();
 
   // t.timeout(300 * 1000); // milliseconds
 
   makeLevel(taskset, 0, 3, "build/vol");
 
-  return taskset.run(`build/vol`)
-    .then((count) => {
-      t.is(count, 1111, "1111 tasks executed");
-      Cp.execSync("rm -f build/vol*");
-    });
+  return taskset.run(`build/vol`).then((count) => {
+    t.is(count, 1111, "1111 tasks executed");
+    deleteVolumeFiles();
+  });
 });

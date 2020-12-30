@@ -5,7 +5,7 @@
   "version": "0.4.1",
   "description": "Build Tools",
   "engines": {
-    "node": "^10.17"
+    "node": ">=10.17"
   },
   "scripts": {
     "coverage": "nyc npm run test",
