@@ -29,10 +29,10 @@
     "exec_on_version_click": "npm publish --access public"
   },
   "dependencies": {
-    "chalk": "^3.0.0",
+    "chalk": "^4.1.1",
     "glob": "^7.1.6",
     "loglevel": "^1.6.7",
-    "yargs": "^15.1.0"
+    "yargs": "^17.0.1"
   },
   "devDependencies": {
     "ava": "^3.7.0",
