@@ -29,14 +29,14 @@
     "exec_on_version_click": "npm publish --access public"
   },
   "dependencies": {
-    "chalk": "^4.1.1",
-    "glob": "^7.1.6",
-    "loglevel": "^1.6.7",
-    "yargs": "^17.0.1"
+    "chalk": "^4.1.2",
+    "glob": "^7.2.0",
+    "loglevel": "^1.8.0",
+    "yargs": "^17.4.0"
   },
   "devDependencies": {
-    "ava": "^3.7.0",
-    "codecov": "^3.6.5",
-    "nyc": "^15.0.0"
+    "ava": "^3.15.0",
+    "codecov": "^3.8.2",
+    "nyc": "^15.1.0"
   }
 }
