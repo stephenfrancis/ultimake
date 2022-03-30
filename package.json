@@ -2,7 +2,7 @@
   "main": "src/main.js",
   "types": "src/Types.d.ts",
   "name": "ultimake",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Build Tools",
   "engines": {
     "node": ">=10.17"
